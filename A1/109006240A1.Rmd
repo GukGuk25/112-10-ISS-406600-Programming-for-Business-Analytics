@@ -1,0 +1,215 @@
+---
+title: "PBA AS1"
+author: "Jansen Reynaldi Gautama 109006240"
+date: "2023-10-24"
+output: pdf_document
+---
+
+## Package Loading
+
+First I need to load all of the package needed for this assignment
+
+```{r}
+require(lubridate)
+require(gapminder)
+require(readr)
+require(tidyverse)
+```
+
+## Part 1
+
+#### Question 1 (2 points) Locate the directory path where the dataset is stored, load it into R, and take a look at the data. Rubric: 1 point for locating the directory and loading the data; 1 point for verifying the dataset's #dimensions using head() and str() functions.
+
+For loading a csv file we can use red_csv() function and since my csv file is in the same directory as this markdown file i can just use the name of the file as the directory Note : fh -\> file handler
+
+```{r readr}
+fh <- read_csv('online_retail.csv')
+```
+
+we can verify the data inside the csv is the same as the description given. there are 8 row of data : InvoiceNo, StockCode, Description, Quantity, InvoiceDate, UnitPrice, CustomerID, and Country
+
+the size of the matrix is 541909x8 and we can see the data type of the data in each column
+
+```{r}
+head(fh)
+str(fh)
+```
+
+#### Question 2 (3 points)
+
+#### Convert the InvoiceDate to date class and filter the data to include only transactions from July to August 2011. Use this filtered dataset for all subsequent questions in Part I. Rubric: 1 points for converting InvoiceDate to date class; 2 points for correctly filtering the data and verifying the number of unique InvoiceNo entries.
+
+first i need to convert the string into a Date class using as.Date()
+
+```{r}
+fh$InvoiceDate <- as.Date(fh$InvoiceDate, format = "%m/%d/%y")
+```
+
+```{r}
+fh
+class(fh$InvoiceDate)
+```
+
+next i filtered the data using subset() and we can see that there are 42046 data in july and august 2011 Note : ffh -\> filtered file
+
+```{r}
+ffh <- subset(fh,  as.Date('2011-08-31') >= fh$InvoiceDate & fh$InvoiceDate >= as.Date('2011-07-01'))
+```
+
+```{r}
+ffh
+head(ffh)
+tail(ffh)
+```
+
+after i filter the data i need to find how many unique InvoiceNo using unique() to filter and length() to count how many there are. and i found 1908 unique data
+
+```{r}
+length(unique(ffh$InvoiceNo))
+```
+
+#### **Question 3 (6 points)** Perform basic data analysis on the dataset by completing the following tasks: 1. Compute the mean of `Quantity` and `UnitPrice`2. Determine the data types of each column. 3. Compute the number of unique values in each column. Rubric: 2 points for each task.
+
+for finding the mean i used mean() function
+
+```{r}
+mean(ffh$Quantity)
+mean(ffh$UnitPrice)
+```
+
+then i use typeof() to get the type of each column and class() to get the class and we can see them below
+
+```{r}
+cat("Data Type\n")
+typeof(ffh$InvoiceNo)
+typeof(ffh$StockCode)
+typeof(ffh$Description)
+typeof(ffh$Quantity)
+typeof(ffh$InvoiceDate)
+typeof(ffh$UnitPrice)
+typeof(ffh$CustomerID)
+typeof(ffh$Country)
+
+cat("Class\n")
+class(ffh$InvoiceNo)
+class(ffh$StockCode)
+class(ffh$Description)
+class(ffh$Quantity)
+class(ffh$InvoiceDate)
+class(ffh$UnitPrice)
+class(ffh$CustomerID)
+class(ffh$Country)
+```
+
+next i use the same method as q1 to count the number of unique data
+
+```{r}
+length(unique(ffh$InvoiceNo))
+length(unique(ffh$StockCode))
+length(unique(ffh$Description))
+length(unique(ffh$Quantity))
+length(unique(ffh$InvoiceDate))
+length(unique(ffh$UnitPrice))
+length(unique(ffh$CustomerID))
+length(unique(ffh$Country))
+```
+
+#### **Question 4 (6 points)** Conduct a country-specific analysis on the dataset. **Tasks**: 1. Subset the data for transactions in the U.K., Netherlands, and Australia then perform the following analyses separately for each country. 2. Report the average and standard deviation of `UnitPrice` for each country. 3. Report the number of unique transactions and customers in these countries.
+
+u use subset() to filter the country and get the data from UK Netherlands and Australia
+
+```{r}
+ukffh <- subset(ffh, ffh$Country == "United Kingdom")
+nlffh <- subset(ffh, ffh$Country == "Netherlands")
+ausffh <- subset(ffh, ffh$Country == "Australia")
+```
+
+```{r}
+ukffh
+nlffh
+ausffh
+```
+
+next i can use sd() to get the standart deviation and mean() to get the average
+
+```{r}
+sd(ukffh$UnitPrice)
+sd(nlffh$UnitPrice)
+sd(ausffh$UnitPrice)
+mean(ukffh$UnitPrice)
+mean(nlffh$UnitPrice)
+mean(ausffh$UnitPrice)
+```
+
+and i use length() and unique() to get unique data
+
+```{r}
+cat("UK\n InvoiceNo :", length(unique(ukffh$InvoiceNo)),"\n CustomerID",length(unique(ukffh$CustomerID)), "\n")
+
+cat("Netherland\n InvoiceNo :", length(unique(nlffh$InvoiceNo)),"\n CustomerID", length(unique(nlffh$CustomerID)), "\n")
+
+cat("Australia\n InvoiceNo :", length(unique(ausffh$InvoiceNo)),"\n CustomerID", length(unique(ausffh$CustomerID)))
+
+```
+
+#### **Question 5 (5 points) i**dentify and count customers who made a refund. **Rubric**: 3 points for identifying customers who made a refund; 2 points for counting the number of such customers and storing their IDs in a vector called `cust_refund`.
+
+to get the refund data i just need to filter them using subset() and grab the negative quantity
+
+```{r}
+reffundffh <- subset(ffh, ffh$Quantity<0)
+refcusffh <- unique(reffundffh$CustomerID)
+```
+
+```{r}
+reffundffh
+length(refcusffh)
+```
+
+#### **Question 6 (5 points)** Some customers made purchases without logging into the e-commerce site. This would create records of transactions for which the CustomerID is missing (i.e., NA). These transactions cannot be traced since we do not know who ordered the products. Analyze transactions with missing `CustomerID`. **Tasks**: 1. Create a variable called `Sales` by multiplying `Quantity` and `UnitPrice`. 2. Calculate the total sales amount for transactions where `CustomerID` is missing. **Rubric**: 2 points for the first task; 3 points for the second task.
+
+first calculate the sales
+
+```{r}
+ffh$sales <- ffh$Quantity * ffh$UnitPrice
+ffh
+```
+
+then find the transaction without CustomerID
+
+```{r}
+unknownsales <- subset(ffh, is.na(ffh$CustomerID))
+sum(unknownsales$sales)
+```
+
+```{r}
+unknownsales
+```
+
+#### **Question 7 (5 points)** Ensure that the `gapminder` and `tidyverse` packages are loaded properly. Use the `glimpse()` function to display basic details about the `gapminder` dataset. In the main text (that is, outside of a code chunk), tell us how many rows and columns there are in the data set and which of the variables are factors. **Rubric**: 2 write-up points for using the glimpse function; 2 points for reporting the dimension of the data; 1 point for identifying factors.
+
+we can use glimpse() function to see the component of gapminder
+
+the dimension of the data is 6x1704, which means 6 category with 1704 data each, there are 2 factors which is the country and continent
+
+```{r}
+glimpse(gapminder)
+```
+
+#### **Question 8 (10 points)** Let's investigate how life expectancy varies across the continents. Using `ggplot`, we want you to recreate the following figure: These are boxplots of the distribution of life expectancy in each continent. Please make sure that you include the labels as shown in this figure.
+
+**Rubric**: 10 points for correctly recreating the box plots.
+
+```{r}
+ggplot(gapminder, aes(x = continent, y = lifeExp)) +
+  geom_boxplot() +
+    labs(
+    title = "Life Expectancy by Continent",
+    x = "Continent",
+    y = "Life Expectancy"
+  )
+```
+
+#### **Question 9 (5 points)**Looking at the previous plot, which continent has the highest median life expectancy? Which part of the boxplot can we determine this from? **Rubric**: 2 points for identifying the correct continent; 3 write-up points for correctly identifying how to find this on the boxplot.
+
+the median can be seen from the line in the middle of the box of each plot, so to find which continent that have the highest live expectancy we just need to find the line that is the highest position which we can see clearly its Oceania

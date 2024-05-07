@@ -1,0 +1,364 @@
+---
+title: "109006240A2"
+author: "Jansen Reynaldi Gautama"
+date: "2023-11-23"
+output: pdf_document
+---
+
+## Package Loading
+
+------------------------------------------------------------------------
+
+```{r}
+require(lubridate)
+require(gapminder)
+require(readr)
+require(knitr)
+require(dplyr)
+require(tidyverse)
+require(tidyr)
+
+```
+
+# Part 1
+
+## Question 1
+
+red csv
+
+```{r}
+air99 <- read_csv('pm99.csv')
+air12 <- read_csv('pm12.csv')
+```
+
+do 3 task asked in pipe sequence then combine and drop row with na
+
+```{r}
+air99 <- air99 %>%
+  mutate(Year = 1999, PM2.5 = Sample.Value) %>%
+  select(-Sample.Value)
+
+air12 <- air12 %>%
+  mutate(Year = 2012, PM2.5 = Sample.Value) %>%
+  select(-Sample.Value)
+
+air_combined <- bind_rows(air99, air12) %>% 
+  drop_na()
+
+```
+
+now we can check the dataframe using glimpse()
+
+```{r}
+glimpse(air_combined)
+```
+
+to make sure that the NA dropped i also check using is.na()
+
+```{r}
+any_na <- any(is.na(air99))
+any_na
+any_na <- any(is.na(air12))
+any_na
+any_na <- any(is.na(air_combined))
+any_na
+```
+
+## Question 2
+
+group by and summarize the statistic
+
+```{r}
+pm_summary <- air_combined %>%
+  group_by(Year) %>%
+  summarize(
+    mean_pm25 = mean(PM2.5),
+    median_pm25 = median(PM2.5),
+    min_pm25 = min(PM2.5),
+    max_pm25 = max(PM2.5)
+  )
+```
+
+filter the PM2.5\>0
+
+```{r}
+air_combined <- air_combined %>%
+  filter(PM2.5 > 0)
+```
+
+make sure the data is good
+
+```{r}
+pm_summary
+head(air_combined)
+```
+
+## Question 3
+
+do all the things mentioned and make the box plot
+
+```{r fig.height=3, fig.width=10, fig.align='center'}
+ggplot(air_combined, aes(x = as.factor(Year), y = log2(PM2.5), fill = as.factor(Year))) +
+  geom_boxplot() +
+  labs(x = "Year", y = "Log2 PM2.5") +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  coord_flip()
+```
+
+as we can see that in 2012 the distribution are spread widely and there are time where the polution is really bad and where the polution is lower, in 1999 the max polution is lower and have smaller spread than 2012, but overall the polution in 2012 is lower and we can see it by the median of the box plot where its smaller than 1999 and we can also verify it by looking at the pm_summary.
+
+and the reason this happened as mentioned in the question the 2012 data are more concentrated in cleaner areas and that explained why the 2012 is lower than in 1999
+
+## Question 4
+
+create subset to get the NYC data
+
+```{r}
+ny_data <- subset(air_combined, State.Code == 36)
+```
+
+use paste0 to create site.code
+
+```{r}
+ny_data$site.code <- paste0(ny_data$County.Code, ".", ny_data$Site.ID)
+```
+
+```{r}
+head(ny_data)
+```
+
+## Question 5
+
+Group by site.code then use n_distinct in filter to make monitor
+
+```{r}
+ny_data_group <- ny_data %>%
+  group_by(site.code) %>%
+  filter(n_distinct(Year)==2)
+```
+
+```{r}
+active_both_year<- pull(ny_data_group, site.code)
+```
+
+now we can use unique to check how many site.code existed in 1999 and 2012 and we can see there are 10 out of 41 site.code that existed booth in 2012 and 1999
+
+```{r}
+unique(active_both_year)
+```
+
+```{r}
+unique(ny_data$site.code)
+```
+
+## Question 6
+
+filter the ny data extracting active_both_year
+
+```{r}
+filtered_nyc_active_both_year <- ny_data %>%
+  filter(site.code %in% active_both_year)
+```
+
+count the site.code and sort it in decending order
+
+```{r}
+most_active <- filtered_nyc_active_both_year %>%
+  count(site.code, sort = TRUE)
+```
+
+```{r}
+most_active
+```
+
+## Question 7
+
+filter the ny_data acording to site.code and get the 101.0003 only, then mutate the date and get the date of year
+
+```{r}
+air101.0003 <- ny_data %>%
+  filter(site.code == "101.0003") %>%
+  mutate(Date = ymd(Date), dayofyear = yday(Date))
+
+```
+
+```{r}
+air101.0003
+```
+
+## Question 8
+
+we can see that acording this data the air quality in first 3 month of 2012 is better than last 5 month of 1999 where in 1999 it reach max above 25 and in 2012 it almost reach 12.5.
+
+just by seeing the plot we can also know that the average PM2.5 is lower in 2012 than in 1999 which means quality improves and acording to google PM2.5 is saves under 12.5 which happened in 2012 and it means at some time air quality in some part of NY is really bad and reach a dagerous level
+
+```{r fig.align='center'}
+ggplot(air101.0003, aes(x = dayofyear, y = PM2.5)) +
+  geom_point() +
+  labs(x = "Day of the Year", y = "PM2.5") +
+  facet_wrap(~Year, ncol = 2)
+
+```
+
+# Part 2
+
+## Question 9
+
+in this part we can see how the dataset is distributed from the average so for example we can see the age average is 24, most of the participant is a HS dropout, etc.
+
+first read the csv
+
+```{r}
+lalonde <- read_csv('lalonde.csv')
+```
+
+```{r}
+lalonde
+```
+
+we can create the balancetable by grouping by treat then use summarize and get the mean/avg of all the variables then we can use kable to get a table
+
+```{r}
+balance_table <- lalonde %>%
+  group_by(treat) %>%
+  summarize(
+    age_avg = mean(age),
+    education_avg = mean(education),
+    black_avg = mean(black),
+    hispanic_avg = mean(hispanic),
+    married_avg = mean(married),
+    nodegree_avg = mean(nodegree)
+  )
+knitr::kable(balance_table, caption ="Covariate Balance", 
+             col.names = c("Group", "Age", "Education", "Black", "Hispanic", "Married", "No Degree"))
+```
+
+## Question 10
+
+we can see below that people that get treatment have a higher change when they get treatment and the difference are pretty high as we can see that people who get treatment they improve between 40-50% more than people that didnt get the treatment
+
+first create the change
+
+```{r}
+lalonde <- lalonde %>%
+  mutate(change = re78 - re75)
+```
+
+then get the avg of changes of treated group and ctr group and we can see that treated group has higher change avg
+
+```{r}
+trt_change <- lalonde %>%
+  filter(treat == 1) %>%
+  summarize(avg_change = mean(change))
+trt_change
+```
+
+```{r}
+ctr_change <- lalonde %>%
+  filter(treat == 0) %>%
+  summarize(avg_change = mean(change))
+ctr_change
+```
+
+and we can see ate which is the avg treatment effect
+
+```{r}
+ate <- trt_change - ctr_change
+ate
+```
+
+## Question 11
+
+In this experiment there are 2 group, 1 group where they get a special treatment/course and the other don't get the treatment which is the control group. and this experiment give us insight of the effect of the treatment to a bunch of people and we can see that the group who get the treatment their earning grows higher than the control group. and i think there are some bias in the data since in my opinion we can't only see whether they get treatment or not because in my opinion there are more factors such as people characteristic and other uncontrolable variables
+
+## Question 12
+
+in my opinion we should use the difference between the begining(re75) and the end(re78) because we want to see the growth not what they earn before of after, because re75 depends on the person it self and re78 also depends on re75.
+
+## Question 13
+
+we can see that people that finished highschool have higher ATE which means that people that finished HS get higher impact from the treatment than people who dropped out from HS
+
+for this part i just follow the direction.
+
+```{r}
+ate_dropout <- lalonde %>%
+  mutate(
+    dropout = ifelse(nodegree == 1, "Dropped out", "Finished HS"),
+    treatment_group = ifelse(treat == 1, "Treated", "Control")
+  ) %>%
+  group_by(dropout, treatment_group) %>%
+  summarize(mean_change = mean(change)) %>%
+  pivot_wider(names_from = treatment_group, values_from = mean_change) %>%
+  mutate(ATE = Treated - Control) %>%
+  select(dropout, Treated, Control, ATE)
+```
+
+```{r}
+ate_dropout
+```
+
+```{r}
+knitr::kable(ate_dropout, caption ="ATE by DO Status", col.names = c("Dropout Status", "Mean Change (Treated)", "Mean Change (Control)", "ATE"))
+```
+
+## Question 14
+
+as we can see below that the treatment give more impact to people between age 31-40
+
+first we use case when to group the data according to the age range
+
+```{r}
+lalonde <- lalonde %>%
+  mutate(
+    age_group = case_when(
+      age <= 30 ~ "30 and under",
+      age > 30 & age <= 40 ~ "31 - 40",
+      age > 40 ~ "Over 40"
+    )
+  )
+```
+
+then we treat the data just like the previous data
+
+```{r}
+ate_age <- lalonde %>%
+  mutate(
+    treatment_group = ifelse(treat == 1, "Treated", "Control")
+  ) %>%
+  group_by(age_group, treatment_group) %>%
+  summarize(mean_change = mean(change, na.rm = TRUE)) %>%
+  pivot_wider(names_from = treatment_group, values_from = mean_change) %>%
+  mutate(ATE = Treated - Control) %>%
+  select(age_group, Treated, Control, ATE)
+```
+
+```{r}
+ate_age
+```
+
+```{r}
+ate_age
+```
+
+```{r}
+knitr::kable(ate_age, caption ="ATE by Age Group", col.names = c("Age Group", "Mean Change (Treated)", "Mean Change (Control)", "ATE"))
+```
+
+## Question 15
+
+as we can see that the ATE improve way better on people on age 31-40 so it means it have better impact on people between age of 31-40
+
+```{r}
+age_plot <- ggplot(ate_age, aes(x = age_group, y = ATE, fill = age_group)) +
+  geom_bar(stat = "identity") +
+  labs(title = "ATE by Age Group",
+       x = "Age Group",
+       y = "Average Treatment Effect (ATE)")
+
+```
+
+```{r}
+age_plot
+```

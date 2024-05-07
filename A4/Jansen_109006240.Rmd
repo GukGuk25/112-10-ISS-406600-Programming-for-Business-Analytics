@@ -1,0 +1,176 @@
+---
+title: "A4_109006240"
+author: "Jansen"
+date: "2023-12-21"
+output: pdf_document
+---
+
+## Package Loading
+
+------------------------------------------------------------------------
+
+```{r}
+require(lubridate) 
+require(gapminder) 
+require(readr) 
+require(knitr) 
+require(dplyr)
+require(tidyverse)
+require(tidyr) 
+require(ggplot2)
+require(broom)
+require(Metrics)
+require(infer)
+```
+
+## Question 1
+
+ATE represent the difference between those who received the rags to rich TV treatment and control in this context we can simply think if the ATE are positive then the TV treatment give positive affect, vice versa
+
+```{r}
+rags <- read_csv('rags.csv')
+subset_rags <- rags %>%
+  mutate(
+    treatment = if_else(condition2 == 1, "Rags to Riches", "Control"),
+    optimist = if_else(optimism_index >= 3, "Optimist", "Pessimist")
+  )
+treatment <- subset_rags$treatment
+optimist <- subset_rags$optimist
+treatment
+optimist
+rags
+subset_rags
+```
+
+```{r}
+mobility_diff <- subset_rags %>%
+  group_by(treatment) %>%
+  summarize(mean_mobility = mean(mobility)) %>%
+  pivot_wider(names_from = treatment, values_from = mean_mobility) %>%
+  mutate(ATE = `Rags to Riches` - Control)
+mobility_diff
+```
+
+## Question 2
+
+there are no zero in the CI we can see it on the graph that within the 2 line there are no zero, which means that the treatment do have an impact to the outcome
+
+```{r}
+library(infer)
+set.seed(2023)
+
+ate_boots <- subset_rags %>%
+  specify(response = mobility, explanatory = treatment) %>%
+  generate(reps = 1000, type = "bootstrap") %>%
+  calculate(stat = "diff in means", order = c("Rags to Riches", "Control"))
+
+
+ate_ci_95 <- ate_boots %>%
+  get_confidence_interval(level = 0.95, type = "percentile")
+
+ate_ci_95
+ggplot(data = ate_boots, aes(x = stat)) +
+  geom_histogram(aes(y = ..density..)) +
+  geom_vline(xintercept = unlist(ate_ci_95), linewidth = 1) +
+  labs(x = "ATE", y = "Density") +
+  theme_minimal()
+```
+
+## Question 3
+
+Explain how to interpret 95% confidence intervals in terms of repeated sampling. = if we repeat the sampling again again and again around 95% of that interval is true
+
+Is it possible to produce a 100% confidence interval in this setting? If so, what is it and is it useful? = i think its possible to produce a 100% CI but i don't think it will be usefull
+
+## Question 4
+
+so in this part we bassically wanted to see how the treatment affect 2 kind of people, thseo that are optimist and those that are pessimist and the ate_diff just show the difference between the affect that pes and opt get and we can see in the tibble that the optimistic group have a higher ATE which means those that are optimist gain more benefit from the TV treatment
+
+```{r}
+ATE_optimist <- subset_rags %>%
+  filter(optimist == "Optimist") %>%
+  group_by(treatment) %>%
+  summarize(mean_mobility = mean(mobility)) %>%
+  pivot_wider(names_from = treatment, values_from = mean_mobility) %>%
+  mutate(ATE_Opt = `Rags to Riches` - Control) %>%
+  pull(ATE_Opt)
+
+ATE_pessimist <- subset_rags %>%
+  filter(optimist == "Pessimist") %>%
+  group_by(treatment) %>%
+  summarize(mean_mobility = mean(mobility)) %>%
+  pivot_wider(names_from = treatment, values_from = mean_mobility) %>%
+  mutate(ATE_Pes = Control - `Rags to Riches`) %>%
+  pull(ATE_Pes)
+ATE_diff <- ATE_optimist - ATE_pessimist
+
+ate_optimist <- tibble(
+  ATE_Opt = ATE_optimist,
+  ATE_Pes = ATE_pessimist,
+  ATE_Diff = ATE_diff
+)
+
+ate_optimist
+
+```
+
+## Question 5
+
+if we see the plot there are no 0 in the confidence interval so we can confidently conclude that there is a statistically significant difference in the treatment effects between Optimists and Pessimists. and the treatment does have impact
+
+```{r}
+set.seed(2023)
+
+ate_optimist_boots <- tibble(
+  replicate = numeric(),
+  ATE_Opt = numeric(),
+  ATE_Pes = numeric(),
+  ATE_Diff = numeric()
+)
+
+bootstrap_replicates <- subset_rags %>%
+  rep_slice_sample(prop = 1, reps = 1000, replace = TRUE) %>%
+  group_by(replicate)
+
+for (i in 1:1000) {
+  ATE_optimist <- bootstrap_replicates %>%
+    filter(optimist == "Optimist") %>%
+    filter(replicate == i) %>%
+    group_by(treatment) %>%
+    summarize(mean_mobility = mean(mobility)) %>%
+    pivot_wider(names_from = treatment, values_from = mean_mobility) %>%
+    mutate(ATE_Opt = `Rags to Riches` - Control) %>%
+    pull(ATE_Opt)
+  
+  ATE_pessimist <- bootstrap_replicates %>%
+    filter(optimist == "Pessimist") %>%
+    filter(replicate == i) %>%
+    group_by(treatment) %>%
+    summarize(mean_mobility = mean(mobility)) %>%
+    pivot_wider(names_from = treatment, values_from = mean_mobility) %>%
+    mutate(ATE_Pes = Control - `Rags to Riches`) %>%
+    pull(ATE_Pes)
+  ATE_diff <- ATE_optimist - ATE_pessimist
+  
+  temp <- tibble(
+    replicate = i,
+    ATE_Opt = ATE_optimist,
+    ATE_Pes = ATE_pessimist,
+    ATE_Diff = ATE_diff
+  )
+  ate_optimist_boots <- bind_rows(ate_optimist_boots, temp)
+}
+bootstrap_replicates
+ate_optimist_boots
+
+ate_optimist_ci_95 <- ate_optimist_boots %>%
+  get_confidence_interval(level = 0.95, type = "percentile")
+ate_optimist_ci_95
+
+ggplot(data = ate_boots, aes(x = stat)) +
+  geom_histogram(aes(y = ..density..)) +
+  geom_vline(xintercept = unlist(ate_optimist_ci_95), linewidth = 1, color = "red") +
+  labs(x = "ATE", y = "Density") +
+  theme_minimal()
+
+```
